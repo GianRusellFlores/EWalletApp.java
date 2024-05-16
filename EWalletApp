@@ -1,0 +1,223 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashMap;
+import java.util.Map;
+
+public class EWalletApp extends JFrame {
+
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    private Map<String, User> userDatabase;
+    private User currentUser;
+
+    // GUI Components
+    private JTextField loginUsernameField, createAccountUsernameField;
+    private JPasswordField loginPasswordField, createAccountPasswordField;
+    private JTextArea transactionHistoryArea;
+    private JLabel balanceLabel;
+
+    public EWalletApp() {
+        userDatabase = new HashMap<>();
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+
+        // Initial Panels for creating and login acount
+        mainPanel.add(createLoginPanel(), "LoginPanel");
+        mainPanel.add(createMainMenuPanel(), "MainMenuPanel");
+        mainPanel.add(createCreateAccountPanel(), "CreateAccountPanel");
+
+        add(mainPanel);
+        setTitle("EWallet FINAL PROJECT");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+    }
+
+    private JPanel createLoginPanel() {
+        JPanel loginPanel = new JPanel(new GridLayout(4, 2));
+        loginPanel.add(new JLabel("Username:"));
+        loginUsernameField = new JTextField();
+        loginPanel.add(loginUsernameField);
+
+        loginPanel.add(new JLabel("Password:"));
+        loginPasswordField = new JPasswordField();
+        loginPanel.add(loginPasswordField);
+
+        JButton loginButton = new JButton("Login");
+        loginButton.addActionListener(new LoginAction());
+        loginPanel.add(loginButton);
+
+        JButton createAccountButton = new JButton("Create Account");
+        createAccountButton.addActionListener(e -> cardLayout.show(mainPanel, "CreateAccountPanel"));
+        loginPanel.add(createAccountButton);
+
+        return loginPanel;
+    }
+
+    private JPanel createCreateAccountPanel() {
+        JPanel createAccountPanel = new JPanel(new GridLayout(4, 2));
+        createAccountPanel.add(new JLabel("New Username:"));
+        createAccountUsernameField = new JTextField();
+        createAccountPanel.add(createAccountUsernameField);
+
+        createAccountPanel.add(new JLabel("New Password:"));
+        createAccountPasswordField = new JPasswordField();
+        createAccountPanel.add(createAccountPasswordField);
+
+        JButton createButton = new JButton("Create");
+        createButton.addActionListener(new CreateAccountAction());
+        createAccountPanel.add(createButton);
+
+        JButton backButton = new JButton("Back");
+        backButton.addActionListener(e -> cardLayout.show(mainPanel, "LoginPanel"));
+        createAccountPanel.add(backButton);
+
+        return createAccountPanel;
+    }
+
+    private JPanel createMainMenuPanel() {
+        JPanel mainMenuPanel = new JPanel(new GridLayout(7, 1));
+
+        JButton cashInButton = new JButton("Cash In");
+        cashInButton.addActionListener(e -> {
+            String amount = JOptionPane.showInputDialog("Enter amount to cash in:");
+            if (amount != null) {
+                currentUser.cashIn(Double.parseDouble(amount));
+                updateBalance();
+            }
+        });
+        mainMenuPanel.add(cashInButton);
+
+        JButton cashOutButton = new JButton("Cash Out");
+        cashOutButton.addActionListener(e -> {
+            String amount = JOptionPane.showInputDialog("Enter amount to cash out:");
+            if (amount != null) {
+                currentUser.cashOut(Double.parseDouble(amount));
+                updateBalance();
+            }
+        });
+        mainMenuPanel.add(cashOutButton);
+
+        JButton checkBalanceButton = new JButton("Check Balance");
+        checkBalanceButton.addActionListener(e -> updateBalance());
+        mainMenuPanel.add(checkBalanceButton);
+
+        JButton checkHistoryButton = new JButton("Check History");
+        checkHistoryButton.addActionListener(e -> {
+            transactionHistoryArea.setText(currentUser.getTransactionHistory());
+            JOptionPane.showMessageDialog(this, new JScrollPane(transactionHistoryArea), "Transaction History", JOptionPane.INFORMATION_MESSAGE);
+        });
+        mainMenuPanel.add(checkHistoryButton);
+
+        JButton removeAccountButton = new JButton("Remove Account");
+        removeAccountButton.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to remove your account?", "Confirm", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                userDatabase.remove(currentUser.getUsername());
+                logout();
+            }
+        });
+        mainMenuPanel.add(removeAccountButton);
+
+        JButton logoutButton = new JButton("Logout");
+        logoutButton.addActionListener(e -> logout());
+        mainMenuPanel.add(logoutButton);
+
+        balanceLabel = new JLabel("Balance: $0.0");
+        mainMenuPanel.add(balanceLabel);
+
+        transactionHistoryArea = new JTextArea(10, 30);
+        transactionHistoryArea.setEditable(false);
+
+        return mainMenuPanel;
+    }
+
+    private void updateBalance() {
+        balanceLabel.setText("Balance: $" + currentUser.getBalance());
+    }
+
+    private void logout() {
+        currentUser = null;
+        cardLayout.show(mainPanel, "LoginPanel");
+    }
+
+    private class LoginAction implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String username = loginUsernameField.getText();
+            String password = new String(loginPasswordField.getPassword());
+
+            if (userDatabase.containsKey(username) && userDatabase.get(username).checkPassword(password)) {
+                currentUser = userDatabase.get(username);
+                cardLayout.show(mainPanel, "MainMenuPanel");
+                updateBalance();
+            } else {
+                JOptionPane.showMessageDialog(EWalletApp.this, "Invalid username or password", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private class CreateAccountAction implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String username = createAccountUsernameField.getText();
+            String password = new String(createAccountPasswordField.getPassword());
+
+            if (!userDatabase.containsKey(username)) {
+                userDatabase.put(username, new User(username, password));
+                JOptionPane.showMessageDialog(EWalletApp.this, "Account created successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                cardLayout.show(mainPanel, "LoginPanel");
+            } else {
+                JOptionPane.showMessageDialog(EWalletApp.this, "Username already exists", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // User class
+    class User {
+        private String username;
+        private String password;
+        private double balance;
+        private StringBuilder transactionHistory;
+
+        public User(String username, String password) {
+            this.username = username;
+            this.password = password;
+            this.balance = 0.0;
+            this.transactionHistory = new StringBuilder("Transaction History:\n");
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public boolean checkPassword(String password) {
+            return this.password.equals(password);
+        }
+
+        public double getBalance() {
+            return balance;
+        }
+
+        public void cashIn(double amount) {
+            balance += amount;
+            transactionHistory.append("Cashed in: $").append(amount).append("\n");
+        }
+
+        public void cashOut(double amount) {
+            if (amount <= balance) {
+                balance -= amount;
+                transactionHistory.append("Cashed out: $").append(amount).append("\n");
+            } else {
+                JOptionPane.showMessageDialog(EWalletApp.this, "Insufficient funds", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        public String getTransactionHistory() {
+            return transactionHistory.toString();
+        }
+    }
+
+}
